@@ -26,9 +26,22 @@ def get_model_params(model_name, max_tokens_value=3000):
     # GPT-5 and GPT-4.1 models use the responses.create() API 
     # Older models use the standard chat.completions.create() API
     gpt5_models = ["gpt-5", "gpt-5-mini", "gpt-5-nano"]
+    gpt52_models = ["gpt-5.2", "gpt-5.2-pro"]
     gpt41_models = ["gpt-4.1"]
     
-    if any(model_prefix in model_name for model_prefix in gpt5_models):
+    if any(model_prefix in model_name for model_prefix in gpt52_models):
+        # GPT-5.2 models: use responses.create() API with specific parameters
+        params["text"] = {"format": "text"}
+        params["summary"] = "auto"
+        
+        if "gpt-5.2-pro" in model_name:
+            # GPT-5.2-pro specific: store responses for fine-tuning
+            params["store"] = True
+        else:
+            # GPT-5.2 specific: effort and verbosity controls
+            params["reasoning"] = {"effort": "medium"}
+            params["verbosity"] = "medium"
+    elif any(model_prefix in model_name for model_prefix in gpt5_models):
         # GPT-5 models: use responses.create() API with no token parameters
         # Token limits are handled by the model automatically
         pass  # No additional parameters needed for GPT-5
@@ -585,13 +598,15 @@ def get_stock_news_openai(ticker, curr_date):
         # Get model-specific parameters
         model_params = get_model_params(model)
         
-        # Check if this is a GPT-5 or GPT-4.1 model (both use responses.create())
+        # Check if this is a GPT-5/GPT-5.2 or GPT-4.1 model (both use responses.create())
         gpt5_models = ["gpt-5", "gpt-5-mini", "gpt-5-nano"]
+        gpt52_models = ["gpt-5.2", "gpt-5.2-pro"]
         gpt41_models = ["gpt-4.1"]
         is_gpt5 = any(model_prefix in model for model_prefix in gpt5_models)
+        is_gpt52 = any(model_prefix in model for model_prefix in gpt52_models)
         is_gpt41 = any(model_prefix in model for model_prefix in gpt41_models)
         
-        if is_gpt5 or is_gpt41:
+        if is_gpt5 or is_gpt52 or is_gpt41:
             # Use responses.create() API with web search capabilities - use standardized ticker
             user_message = f"Search the web and analyze current social media sentiment and recent news for {ticker_info['display_format']} ({openai_ticker}) from {start_date} to {curr_date}. Include:\n" + \
                           f"1. Overall sentiment analysis from recent social media posts\n" + \
@@ -601,7 +616,46 @@ def get_stock_news_openai(ticker, curr_date):
                           f"5. Summary table with key metrics"
             
             # Base parameters for responses.create()
-            if is_gpt5:
+            if is_gpt52:
+                # GPT-5.2 uses "developer" role with specific parameters
+                api_params = {
+                    "model": model,
+                    "input": [
+                        {
+                            "role": "developer",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": "You are a financial research assistant with web search access. Use real-time web search to provide focused social media sentiment analysis and recent news about the specified ticker. Prioritize speed and key insights."
+                                }
+                            ]
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": user_message
+                                }
+                            ]
+                        }
+                    ],
+                    "text": {"format": {"type": "text"}},
+                    "tools": [{
+                        "type": "web_search",
+                        "user_location": {"type": "approximate"},
+                        "search_context_size": "medium"
+                    }],
+                    "include": ["web_search_call.action.sources"]
+                }
+                # Apply GPT-5.2 specific parameters
+                api_params["summary"] = "auto"
+                if "gpt-5.2-pro" in model:
+                    api_params["store"] = True
+                else:
+                    api_params["reasoning"] = {"effort": "medium"}
+                    api_params["verbosity"] = "medium"
+            elif is_gpt5:
                 # GPT-5 uses "developer" role - optimized for speed
                 api_params = {
                     "model": model,
@@ -695,8 +749,8 @@ def get_stock_news_openai(ticker, curr_date):
             )
 
         # Parse response based on API type
-        if is_gpt5 or is_gpt41:
-            # Extract content from GPT-5 responses.create() structure
+        if is_gpt5 or is_gpt52 or is_gpt41:
+            # Extract content from GPT-5/GPT-5.2 responses.create() structure
             content = None
             if hasattr(response, 'output_text') and response.output_text:
                 content = response.output_text
@@ -751,16 +805,18 @@ def get_global_news_openai(curr_date, ticker_context=None):
         # Get model-specific parameters
         model_params = get_model_params(model)
         
-        # Check if this is a GPT-5 or GPT-4.1 model (both use responses.create())
+        # Check if this is a GPT-5/GPT-5.2 or GPT-4.1 model (both use responses.create())
         gpt5_models = ["gpt-5", "gpt-5-mini", "gpt-5-nano"]
+        gpt52_models = ["gpt-5.2", "gpt-5.2-pro"]
         gpt41_models = ["gpt-4.1"]
         is_gpt5 = any(model_prefix in model for model_prefix in gpt5_models)
+        is_gpt52 = any(model_prefix in model for model_prefix in gpt52_models)
         is_gpt41 = any(model_prefix in model for model_prefix in gpt41_models)
         
         # Determine if this is crypto-related analysis
         is_crypto = ticker_context and ("/" in ticker_context or "USD" in ticker_context.upper() or "BTC" in ticker_context.upper() or "ETH" in ticker_context.upper())
         
-        if is_gpt5 or is_gpt41:
+        if is_gpt5 or is_gpt52 or is_gpt41:
             # Use responses.create() API with web search capabilities
             if is_crypto:
                 user_message = f"Search the web for current global news and developments from {start_date} to {curr_date} that would impact cryptocurrency markets and {ticker_context if ticker_context else 'crypto'} trading. Include:\n" + \
@@ -783,7 +839,46 @@ def get_global_news_openai(curr_date, ticker_context=None):
                               f"7. Summary table with key events and impact levels"
             
             # Base parameters for responses.create()
-            if is_gpt5:
+            if is_gpt52:
+                # GPT-5.2 uses "developer" role with specific parameters
+                api_params = {
+                    "model": model,
+                    "input": [
+                        {
+                            "role": "developer",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": f"You are a financial news analyst with web search access. Use real-time web search to provide comprehensive analysis of global news that could impact {'cryptocurrency markets and blockchain ecosystem' if is_crypto else 'financial markets'} and trading decisions."
+                                }
+                            ]
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": user_message
+                                }
+                            ]
+                        }
+                    ],
+                    "text": {"format": {"type": "text"}},
+                    "tools": [{
+                        "type": "web_search",
+                        "user_location": {"type": "approximate"},
+                        "search_context_size": "medium"
+                    }],
+                    "include": ["web_search_call.action.sources"]
+                }
+                # Apply GPT-5.2 specific parameters
+                api_params["summary"] = "auto"
+                if "gpt-5.2-pro" in model:
+                    api_params["store"] = True
+                else:
+                    api_params["reasoning"] = {"effort": "medium"}
+                    api_params["verbosity"] = "medium"
+            elif is_gpt5:
                 # GPT-5 uses "developer" role
                 api_params = {
                     "model": model,
@@ -872,8 +967,8 @@ def get_global_news_openai(curr_date, ticker_context=None):
             )
 
         # Parse response based on API type
-        if is_gpt5 or is_gpt41:
-            # Extract content from GPT-5 responses.create() structure
+        if is_gpt5 or is_gpt52 or is_gpt41:
+            # Extract content from GPT-5/GPT-5.2 responses.create() structure
             content = None
             if hasattr(response, 'output_text') and response.output_text:
                 content = response.output_text
@@ -922,13 +1017,15 @@ def get_fundamentals_openai(ticker, curr_date):
         # Get model-specific parameters
         model_params = get_model_params(model)
         
-        # Check if this is a GPT-5 or GPT-4.1 model (both use responses.create())
+        # Check if this is a GPT-5/GPT-5.2 or GPT-4.1 model (both use responses.create())
         gpt5_models = ["gpt-5", "gpt-5-mini", "gpt-5-nano"]
+        gpt52_models = ["gpt-5.2", "gpt-5.2-pro"]
         gpt41_models = ["gpt-4.1"]
         is_gpt5 = any(model_prefix in model for model_prefix in gpt5_models)
+        is_gpt52 = any(model_prefix in model for model_prefix in gpt52_models)
         is_gpt41 = any(model_prefix in model for model_prefix in gpt41_models)
         
-        if is_gpt5 or is_gpt41:
+        if is_gpt5 or is_gpt52 or is_gpt41:
             # Use responses.create() API with web search capabilities
             user_message = f"Search the web and provide a current fundamental analysis for {ticker} covering the period from {start_date} to {curr_date}. Include:\n" + \
                           f"1. Key financial metrics (P/E, P/S, P/B, EV/EBITDA, etc.)\n" + \
@@ -942,7 +1039,46 @@ def get_fundamentals_openai(ticker, curr_date):
                           f"Format the analysis professionally with clear sections and include a summary table at the end."
             
             # Base parameters for responses.create()
-            if is_gpt5:
+            if is_gpt52:
+                # GPT-5.2 uses "developer" role with specific parameters
+                api_params = {
+                    "model": model,
+                    "input": [
+                        {
+                            "role": "developer",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": "You are a fundamental analyst with web search access specializing in financial analysis and valuation. Use real-time web search to provide comprehensive fundamental analysis based on available financial metrics and recent company developments."
+                                }
+                            ]
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": user_message
+                                }
+                            ]
+                        }
+                    ],
+                    "text": {"format": {"type": "text"}},
+                    "tools": [{
+                        "type": "web_search",
+                        "user_location": {"type": "approximate"},
+                        "search_context_size": "medium"
+                    }],
+                    "include": ["web_search_call.action.sources"]
+                }
+                # Apply GPT-5.2 specific parameters
+                api_params["summary"] = "auto"
+                if "gpt-5.2-pro" in model:
+                    api_params["store"] = True
+                else:
+                    api_params["reasoning"] = {"effort": "medium"}
+                    api_params["verbosity"] = "medium"
+            elif is_gpt5:
                 # GPT-5 uses "developer" role
                 api_params = {
                     "model": model,
@@ -1040,8 +1176,8 @@ def get_fundamentals_openai(ticker, curr_date):
             )
 
         # Parse response based on API type
-        if is_gpt5 or is_gpt41:
-            # Extract content from GPT-5 responses.create() structure
+        if is_gpt5 or is_gpt52 or is_gpt41:
+            # Extract content from GPT-5/GPT-5.2 responses.create() structure
             content = None
             if hasattr(response, 'output_text') and response.output_text:
                 content = response.output_text

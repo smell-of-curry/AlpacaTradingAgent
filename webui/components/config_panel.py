@@ -160,6 +160,8 @@ def create_config_panel():
             dbc.Select(
                 id="quick-llm",
                 options=[
+                    {"label": "gpt-5.2-pro", "value": "gpt-5.2-pro"},
+                    {"label": "gpt-5.2", "value": "gpt-5.2"},
                     {"label": "gpt-5", "value": "gpt-5"},
                     {"label": "gpt-5-mini", "value": "gpt-5-mini"},
                     {"label": "gpt-5-nano", "value": "gpt-5-nano"},
@@ -179,6 +181,8 @@ def create_config_panel():
             dbc.Select(
                 id="deep-llm",
                 options=[
+                    {"label": "gpt-5.2-pro", "value": "gpt-5.2-pro"},
+                    {"label": "gpt-5.2", "value": "gpt-5.2"},
                     {"label": "gpt-5", "value": "gpt-5"},
                     {"label": "gpt-5-mini", "value": "gpt-5-mini"},
                     {"label": "gpt-5-nano", "value": "gpt-5-nano"},

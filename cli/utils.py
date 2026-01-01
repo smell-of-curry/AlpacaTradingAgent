@@ -127,6 +127,8 @@ def select_shallow_thinking_agent() -> str:
 
     # Define shallow thinking llm engine options with their corresponding model names
     SHALLOW_AGENT_OPTIONS = [
+        ("GPT-5.2-pro - Pro model with response storage for fine-tuning", "gpt-5.2-pro"),
+        ("GPT-5.2 - Latest model with balanced effort and verbosity", "gpt-5.2"),
         ("GPT-5-nano - Ultra-efficient model for lightweight tasks", "gpt-5-nano"),
         ("GPT-5-mini - Streamlined model balancing speed and capability", "gpt-5-mini"),
         ("GPT-4.1 - Proven flagship model for complex operations", "gpt-4.1"),
@@ -166,6 +168,8 @@ def select_deep_thinking_agent() -> str:
 
     # Define deep thinking llm engine options with their corresponding model names
     DEEP_AGENT_OPTIONS = [
+        ("GPT-5.2-pro - Pro model with response storage for fine-tuning", "gpt-5.2-pro"),
+        ("GPT-5.2 - Latest model with balanced effort and verbosity", "gpt-5.2"),
         ("GPT-5 - Next-gen flagship model for high-complexity tasks", "gpt-5"),
         ("GPT-5-mini - Streamlined model balancing speed and capability", "gpt-5-mini"),
         ("GPT-5-nano - Ultra-efficient model for lightweight tasks", "gpt-5-nano"),

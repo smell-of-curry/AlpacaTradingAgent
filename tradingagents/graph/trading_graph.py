@@ -67,7 +67,7 @@ class TradingAgentsGraph:
         quick_think_kwargs = {}
         
         # Models that don't support temperature parameter
-        no_temp_models = ["o3", "o4-mini", "gpt-5", "gpt-5-mini", "gpt-5-nano"]
+        no_temp_models = ["o3", "o4-mini", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5.2", "gpt-5.2-pro"]
         
         if not any(model_prefix in deep_think_model for model_prefix in no_temp_models):
             deep_think_kwargs["temperature"] = 0.2
