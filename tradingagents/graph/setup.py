@@ -82,7 +82,8 @@ class GraphSetup:
                 # Execute the analyst
                 try:
                     # Add a small delay before starting analyst execution
-                    time.sleep(0.1)  # 100ms delay before starting
+                    analyst_call_delay = self.config.get("analyst_call_delay", 0.1)
+                    time.sleep(analyst_call_delay)  # Configurable delay before starting
                     
                     result_state = analyst_node(analyst_state)
                     
@@ -105,7 +106,8 @@ class GraphSetup:
                             merged_state["messages"] = tool_result["messages"]
                             
                             # Add a small delay before making the next LLM call
-                            time.sleep(0.2)  # 200ms delay between tool result and next analyst call
+                            tool_result_delay = self.config.get("tool_result_delay", 0.2)
+                            time.sleep(tool_result_delay)  # Configurable delay between tool result and next analyst call
                             
                             # Run analyst again with tool results
                             result_state = analyst_node(merged_state)
@@ -155,15 +157,16 @@ class GraphSetup:
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(selected_analysts)) as executor:
                 # Submit analyst tasks with delays to avoid API rate limits
                 future_to_analyst = {}
+                analyst_start_delay = self.config.get("analyst_start_delay", 0.5)
                 for i, analyst_type in enumerate(selected_analysts):
-                    # Add a small delay between each analyst start (0.5 seconds apart)
+                    # Add a small delay between each analyst start (configurable to avoid API overload)
                     if i > 0:
-                        time.sleep(0.5)
+                        time.sleep(analyst_start_delay)
                     
                     analyst_node = analyst_nodes[analyst_type]
                     future = executor.submit(execute_single_analyst, (analyst_type, analyst_node))
                     future_to_analyst[future] = analyst_type
-                    print(f"[PARALLEL] Submitted {analyst_type} analyst (delay: {i * 0.5}s)")
+                    print(f"[PARALLEL] Submitted {analyst_type} analyst (delay: {i * analyst_start_delay}s)")
                 
                 # Collect results as they complete
                 completed_results = {}

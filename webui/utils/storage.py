@@ -24,11 +24,35 @@ DEFAULT_SETTINGS = {
     "deep_llm": "gpt-5-nano"
 }
 
+# Default API keys structure (empty by default, loaded from localStorage or .env)
+DEFAULT_API_KEYS = {
+    "openai": "",
+    "alpaca-key": "",
+    "alpaca-secret": "",
+    "finnhub": "",
+    "fred": "",
+    "coindesk": "",
+    "alpaca-paper": True
+}
+
+
 def get_default_settings() -> Dict[str, Any]:
     """Get the default settings structure"""
     return DEFAULT_SETTINGS.copy()
+
+
+def get_default_api_keys() -> Dict[str, Any]:
+    """Get the default API keys structure"""
+    return DEFAULT_API_KEYS.copy()
+
 
 def create_storage_store_component():
     """Create a dcc.Store component for localStorage persistence"""
     from dash import dcc
     return dcc.Store(id='settings-store', storage_type='local', data=DEFAULT_SETTINGS)
+
+
+def create_api_keys_store_component():
+    """Create a dcc.Store component for API keys localStorage persistence"""
+    from dash import dcc
+    return dcc.Store(id='api-keys-store', storage_type='local', data=DEFAULT_API_KEYS)

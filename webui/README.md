@@ -34,9 +34,10 @@ run_app(port=7860, debug=True)
 ## Features
 
 - Interactive stock charts with technical indicators
-- Real-time agent status updates
+- Real-time agent status updates with parallel execution support
 - Detailed analysis reports in a tabbed interface
 - Configurable analysis parameters (ticker, date, analysts, LLMs)
+- Parallel analyst execution for faster analysis with API rate limiting
 - Dark mode UI optimized for financial data visualization
 
 ## Dependencies

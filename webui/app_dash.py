@@ -125,7 +125,8 @@ def run_app(port=7860, share=False, server_name="127.0.0.1", debug=False, max_th
         port=port,
         host=server_name,
         debug=debug,
-        dev_tools_hot_reload=debug
+        dev_tools_hot_reload=debug,
+        use_reloader=False  # Disable reloader to prevent double-start in debug mode
     )
     
     return 0

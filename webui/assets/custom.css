@@ -1391,3 +1391,198 @@ body {
     }
 }
 
+/* ============================================
+   API Configuration Modal Styling
+   ============================================ */
+
+.config-apis-btn {
+    transition: all 0.3s ease;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+}
+
+.config-apis-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.api-config-modal .modal-content {
+    background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+    border: 1px solid #374151;
+    border-radius: 12px;
+}
+
+.api-config-modal-header {
+    background: linear-gradient(135deg, #374151 0%, #1F2937 100%);
+    border-bottom: 1px solid #4B5563;
+    border-radius: 12px 12px 0 0;
+}
+
+.api-config-modal-header h4 {
+    color: #F59E0B;
+    font-weight: 600;
+}
+
+.api-config-modal-body {
+    background: #1E293B;
+    color: #E2E8F0;
+    padding: 1.5rem;
+}
+
+.api-key-input {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    letter-spacing: 0.5px;
+}
+
+.api-key-input::placeholder {
+    color: #64748B;
+    font-style: italic;
+}
+
+.api-key-input:focus {
+    background: #0F172A !important;
+    border-color: #3B82F6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+.api-toggle-btn {
+    border-color: #475569 !important;
+    color: #94A3B8 !important;
+    transition: all 0.2s ease;
+}
+
+.api-toggle-btn:hover {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+    border-color: #3B82F6 !important;
+    color: #3B82F6 !important;
+}
+
+.api-status-indicator {
+    transition: all 0.3s ease;
+}
+
+.api-status-indicator.btn-success,
+.api-status-indicator[color="success"] {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    border-color: #10B981 !important;
+    color: #10B981 !important;
+}
+
+.api-status-indicator.btn-outline-secondary,
+.api-status-indicator[color="outline-secondary"] {
+    background-color: transparent !important;
+    border-color: #475569 !important;
+    color: #64748B !important;
+}
+
+.api-config-modal .modal-footer {
+    background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+    border-top: 1px solid #374151;
+    border-radius: 0 0 12px 12px;
+}
+
+.api-config-modal .btn-outline-danger {
+    border-color: #EF4444;
+    color: #EF4444;
+}
+
+.api-config-modal .btn-outline-danger:hover {
+    background-color: #EF4444;
+    border-color: #EF4444;
+    color: #FFFFFF;
+}
+
+.api-config-modal .btn-outline-info {
+    border-color: #0EA5E9;
+    color: #0EA5E9;
+}
+
+.api-config-modal .btn-outline-info:hover {
+    background-color: #0EA5E9;
+    border-color: #0EA5E9;
+    color: #FFFFFF;
+}
+
+.api-config-modal .btn-primary {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    border: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.api-config-modal .btn-primary:hover {
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.api-config-modal .alert-info {
+    background: rgba(14, 165, 233, 0.1);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    color: #7DD3FC;
+}
+
+.api-config-modal .alert-success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #6EE7B7;
+}
+
+.api-config-modal .alert-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #FCD34D;
+}
+
+.api-config-modal .form-switch .form-check-input {
+    background-color: #475569;
+    border-color: #64748B;
+}
+
+.api-config-modal .form-switch .form-check-input:checked {
+    background-color: #10B981;
+    border-color: #10B981;
+}
+
+.api-config-modal .input-group {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.api-config-modal .input-group .form-control {
+    border-radius: 8px 0 0 8px !important;
+}
+
+.api-config-modal .input-group .btn:last-child {
+    border-radius: 0 8px 8px 0 !important;
+}
+
+/* Animation for save button */
+@keyframes saveSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.api-config-modal .btn-primary:active {
+    animation: saveSuccess 0.2s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .api-config-modal .modal-dialog {
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+    }
+    
+    .api-config-modal-body {
+        padding: 1rem;
+    }
+    
+    .config-apis-btn {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+}
+

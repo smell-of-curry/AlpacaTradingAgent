@@ -34,6 +34,7 @@ AlpacaTradingAgent introduces powerful new capabilities specifically designed fo
 - **News Analyst**: Monitors and interprets financial news and events
 - **Fundamental Analyst**: Assesses company financials and intrinsic value
 - **Macro Analyst**: Analyzes macroeconomic indicators and Federal Reserve data
+- **Parallel Execution**: All 5 analysts run simultaneously for faster analysis with configurable delays to prevent API overload
 
 ### ⚡ **Automated Trading & Scheduling**
 - **Market Hours Trading**: Automatic execution during market hours
@@ -258,6 +259,12 @@ config["max_debate_rounds"] = 2  # Increase debate rounds
 config["online_tools"] = True  # Use real-time data
 config["enable_margin_trading"] = True  # Allow short selling
 config["auto_execute_trades"] = False  # Manual approval required
+
+# Parallel execution settings (to avoid API overload)
+config["parallel_analysts"] = True  # Run analysts in parallel (default: True)
+config["analyst_start_delay"] = 0.5  # Delay between starting each analyst (seconds)
+config["analyst_call_delay"] = 0.1  # Delay before making analyst calls (seconds)
+config["tool_result_delay"] = 0.2  # Delay between tool results and next call (seconds)
 
 # Initialize with custom config
 ta = TradingAgentsGraph(debug=True, config=config)

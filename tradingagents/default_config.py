@@ -19,6 +19,9 @@ DEFAULT_CONFIG = {
     "allow_shorts": False,  # False = Investment mode (BUY/HOLD/SELL), True = Trading mode (LONG/NEUTRAL/SHORT)
     # Execution settings
     "parallel_analysts": True,  # True = Run analysts in parallel for faster execution, False = Sequential execution
+    "analyst_start_delay": 0.5,  # Delay in seconds between starting each analyst (to avoid API overload)
+    "analyst_call_delay": 0.1,  # Delay in seconds before making analyst calls
+    "tool_result_delay": 0.2,  # Delay in seconds between tool results and next analyst call
     # Tool settings
     "online_tools": True,
     # API keys (these will be overridden by environment variables if present)

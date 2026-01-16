@@ -13,6 +13,7 @@ from webui.components.chart_panel import create_chart_panel
 from webui.components.decision_panel import create_decision_panel
 from webui.components.reports_panel import create_reports_panel
 from webui.components.alpaca_account import render_alpaca_account_section
+from webui.components.api_config_modal import create_api_config_modal
 from webui.config.constants import COLORS, REFRESH_INTERVALS
 
 
@@ -47,11 +48,12 @@ def create_intervals():
 
 def create_stores():
     """Create store components for state management"""
-    from webui.utils.storage import create_storage_store_component
+    from webui.utils.storage import create_storage_store_component, create_api_keys_store_component
     return [
         dcc.Store(id='app-store'),
         dcc.Store(id='chart-store', data={'last_symbol': None, 'selected_period': '1y'}),
-        create_storage_store_component()
+        create_storage_store_component(),
+        create_api_keys_store_component()
     ]
 
 
@@ -93,12 +95,18 @@ def create_main_layout():
         className="mb-4"
     )
     
+    # Create API config modal
+    api_config_modal = create_api_config_modal()
+    
     # Assemble the layout
     layout = dbc.Container(
         [
             # Intervals and stores
             *create_intervals(),
             *create_stores(),
+            
+            # API Configuration Modal
+            api_config_modal,
             
             # Client-side script to handle iframe messages for prompt modal
             html.Script("""

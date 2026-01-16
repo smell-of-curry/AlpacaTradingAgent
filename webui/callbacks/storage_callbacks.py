@@ -123,4 +123,16 @@ def register_storage_callbacks(app):
             "deep_llm": deep_llm
         }
         
+        # Check if settings actually changed to prevent circular updates
+        if current_settings:
+            settings_changed = False
+            for key, value in new_settings.items():
+                if current_settings.get(key) != value:
+                    settings_changed = True
+                    break
+            
+            # If no changes, don't update the store to prevent circular callback
+            if not settings_changed:
+                return current_settings
+        
         return new_settings
