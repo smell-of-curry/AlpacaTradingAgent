@@ -107,8 +107,13 @@ def execute_trade_after_analysis(ticker, allow_shorts, trade_amount):
             state["trading_results"] = {"error": f"Trading execution error: {str(e)}"}
 
 
-def run_analysis(ticker, selected_analysts, research_depth, allow_shorts, quick_llm, deep_llm, progress=None):
-    """Run the trading analysis using current/real-time data"""
+def run_analysis(ticker, selected_analysts, research_depth_config, allow_shorts, quick_llm, deep_llm, progress=None):
+    """Run the trading analysis using current/real-time data
+    
+    Args:
+        research_depth_config: Either a dict with "rounds" and "level" keys,
+                              or an integer for backward compatibility
+    """
     try:
         # Always use current date for real-time analysis
         from datetime import datetime
@@ -122,10 +127,21 @@ def run_analysis(ticker, selected_analysts, research_depth, allow_shorts, quick_
         current_state["analysis_running"] = True
         current_state["analysis_complete"] = False
         
+        # Handle both new dict format and legacy integer format
+        if isinstance(research_depth_config, dict):
+            depth_rounds = research_depth_config.get("rounds", 3)
+            depth_level = research_depth_config.get("level", "Medium")
+        else:
+            # Legacy integer format - convert back to string
+            depth_rounds = research_depth_config
+            depth_map = {1: "Shallow", 3: "Medium", 5: "Deep"}
+            depth_level = depth_map.get(research_depth_config, "Medium")
+        
         # Create config with selected options
         config = DEFAULT_CONFIG.copy()
-        config["max_debate_rounds"] = research_depth
-        config["max_risk_discuss_rounds"] = research_depth
+        config["max_debate_rounds"] = depth_rounds
+        config["max_risk_discuss_rounds"] = depth_rounds
+        config["research_depth"] = depth_level  # String for LLM parameter mapping
         config["allow_shorts"] = allow_shorts
         config["parallel_analysts"] = True  # Run analysts in parallel for faster execution
         config["quick_think_llm"] = quick_llm
@@ -242,13 +258,17 @@ def start_analysis(ticker, analysts_market, analysts_social, analysts_news, anal
     if not selected_analysts:
         return "Please select at least one analyst type."
     
-    # Convert research depth to integer to match UI display values
+    # Convert research depth to integer for debate rounds
+    # Also keep the original string for LLM parameter mapping
     if research_depth == "Shallow":
-        depth = 1
+        depth_rounds = 1
     elif research_depth == "Medium":
-        depth = 3
+        depth_rounds = 3
     else:  # Deep
-        depth = 5
+        depth_rounds = 5
+    
+    # Pass both the string (for LLM params) and rounds (for debates)
+    depth_config = {"rounds": depth_rounds, "level": research_depth}
         
     # Create an initial chart immediately with current data
     try:
@@ -262,7 +282,7 @@ def start_analysis(ticker, analysts_market, analysts_social, analysts_news, anal
         traceback.print_exc()
     
     # Run analysis with current data
-    run_analysis(ticker, selected_analysts, depth, allow_shorts, quick_llm, deep_llm, progress)
+    run_analysis(ticker, selected_analysts, depth_config, allow_shorts, quick_llm, deep_llm, progress)
     
     # Update the status message with more details
     trading_mode = "Trading Mode (LONG/NEUTRAL/SHORT)" if allow_shorts else "Investment Mode (BUY/HOLD/SELL)"

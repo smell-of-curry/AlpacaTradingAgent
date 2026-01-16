@@ -5,10 +5,113 @@ Enhanced with symbol-based pagination
 
 from dash import Input, Output, State, ctx, html, ALL, dash, dcc, callback_context
 import dash_bootstrap_components as dbc
+import re
 from webui.utils.state import app_state
 from webui.components.ui import render_researcher_debate, render_risk_debate
 from webui.utils.report_validator import validate_reports_for_ui
 from webui.utils.prompt_capture import get_agent_prompt
+
+
+def _is_table_row(line):
+    if not line:
+        return False
+    return line.count("|") >= 2
+
+
+def _is_separator_row(line):
+    if not line:
+        return False
+    stripped = line.replace("|", "").replace(" ", "")
+    if not stripped:
+        return False
+    return all(ch in "-:" for ch in stripped)
+
+
+def _normalize_table_row(line):
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    if not any(cells):
+        return ""
+    return "| " + " | ".join(cells) + " |"
+
+
+def _normalize_table_block(lines):
+    normalized_rows = []
+    title_line = None
+
+    for idx, line in enumerate(lines):
+        working_line = line
+        if idx == 0 and "table |" in working_line.lower() and not working_line.strip().startswith("|"):
+            title_line, remainder = working_line.split("|", 1)
+            title_line = title_line.strip()
+            working_line = "| " + remainder.strip()
+
+        normalized = _normalize_table_row(working_line)
+        if normalized:
+            normalized_rows.append(normalized)
+
+    if title_line:
+        normalized_rows.insert(0, title_line)
+
+    # Ensure there is a separator row after the header
+    if normalized_rows:
+        header_index = 1 if title_line else 0
+        separator_index = header_index + 1
+        has_separator = len(normalized_rows) > separator_index and _is_separator_row(normalized_rows[separator_index])
+        if len(normalized_rows) > header_index and not has_separator:
+            header_cells = normalized_rows[header_index]
+            num_cells = len(header_cells.strip().strip("|").split("|"))
+            separator = "| " + " | ".join(["---"] * num_cells) + " |"
+            normalized_rows.insert(separator_index, separator)
+
+    return normalized_rows
+
+
+def normalize_markdown_tables(content):
+    """Convert inline pipe tables into proper markdown tables."""
+    if not content:
+        return content
+
+    # Split inline table rows that are concatenated on one line
+    split_lines = []
+    for raw_line in content.splitlines():
+        line = raw_line
+        # Handle inline "Table: | a | b |" patterns
+        if ":" in line and "|" in line and not line.strip().startswith("|"):
+            prefix, remainder = line.split(":", 1)
+            if remainder.strip().startswith("|"):
+                split_lines.append(prefix.strip())
+                line = remainder.strip()
+        # Handle inline "TABLE | a | b |" patterns (no colon)
+        if "table" in line.lower() and "|" in line and not line.strip().startswith("|"):
+            prefix, remainder = line.split("|", 1)
+            split_lines.append(prefix.strip())
+            line = "| " + remainder.strip()
+        # Split concatenated table rows on the same line
+        if "|" in line and " | |" in line:
+            line = re.sub(r"\s*\|\s*\|\s*", "\n| ", line)
+        # Split separator rows concatenated on the same line
+        line = re.sub(r"\s*\|\s*\|\s*-", "\n|-", line)
+        split_lines.extend(line.splitlines())
+
+    # Normalize table blocks
+    output_lines = []
+    i = 0
+    while i < len(split_lines):
+        line = split_lines[i]
+        if _is_table_row(line):
+            block = []
+            while i < len(split_lines) and _is_table_row(split_lines[i]):
+                block.append(split_lines[i])
+                i += 1
+            output_lines.extend(_normalize_table_block(block))
+        else:
+            output_lines.append(line)
+            i += 1
+
+    # Ensure "Notes" following a table starts on new line
+    normalized = "\n".join(output_lines)
+    normalized = re.sub(r"\|\s*Notes", "|\nNotes", normalized)
+    return normalized
 
 
 def create_symbol_button(symbol, index, is_active=False):
@@ -49,6 +152,8 @@ def create_markdown_content(content, default_message="No content available yet."
     
     if not content or content.strip() == "":
         content = default_message
+    elif not is_loading_message:
+        content = normalize_markdown_tables(content)
     
     markdown_component = dcc.Markdown(
         content,

@@ -76,6 +76,15 @@ class AppState:
         self.trade_amount = 1000
         self.trade_occurred = False
 
+    def register_llm_call(self, model_name=None, purpose=None):
+        """Register an LLM call for accurate UI counting."""
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        payload = {"model": model_name, "purpose": purpose}
+        self.llm_calls_log.append((timestamp, "LLM_CALL", payload))
+        self.llm_calls_count = len([call for call in self.llm_calls_log if call[1] == "LLM_CALL"])
+        self.needs_ui_update = True
+
     def add_symbols_to_queue(self, symbols):
         """Add a list of symbols to the analysis queue."""
         self.analysis_queue.extend(symbols)
@@ -826,8 +835,12 @@ class AppState:
                 # Note: Tool calls are now tracked directly in agent_utils.py timing_wrapper
                 # No need to parse them from message chunks
             
-            # Update LLM calls count (tool calls are tracked directly in agent_utils.py)
-            self.llm_calls_count = len([call for call in self.llm_calls_log if call[1] == "Reasoning"])
+            # Update LLM calls count
+            has_llm_calls = any(call[1] == "LLM_CALL" for call in self.llm_calls_log)
+            if has_llm_calls:
+                self.llm_calls_count = len([call for call in self.llm_calls_log if call[1] == "LLM_CALL"])
+            else:
+                self.llm_calls_count = len([call for call in self.llm_calls_log if call[1] == "Reasoning"])
             
             # Tool calls count is updated directly in timing_wrapper, no need to recalculate here
             

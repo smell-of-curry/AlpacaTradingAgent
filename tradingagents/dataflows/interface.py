@@ -16,7 +16,43 @@ import os
 import pandas as pd
 from tqdm import tqdm
 from openai import OpenAI
+import httpx
 from .config import get_config, set_config, DATA_DIR, get_api_key
+
+
+def get_openai_client_with_timeout(api_key, timeout_seconds=300):
+    """Create OpenAI client with configurable timeout for slow web search operations."""
+    return OpenAI(
+        api_key=api_key,
+        timeout=httpx.Timeout(timeout_seconds, connect=10.0)
+    )
+
+
+def get_search_context_for_depth(research_depth=None):
+    """Get the appropriate search_context_size based on research depth.
+    
+    Args:
+        research_depth: "Shallow", "Medium", or "Deep" (or None for default)
+    
+    Returns:
+        str: "low", "medium", or "high" for web search context size
+    
+    Research Depth Mapping:
+        - Shallow: "low" - Faster, less comprehensive (5-10 sources)
+        - Medium: "medium" - Balanced (10-20 sources)
+        - Deep: "high" - Most comprehensive, slowest (20+ sources)
+    """
+    if research_depth is None:
+        config = get_config()
+        research_depth = config.get("research_depth", "Medium")
+    
+    depth_mapping = {
+        "shallow": "low",
+        "medium": "medium", 
+        "deep": "high"
+    }
+    
+    return depth_mapping.get(research_depth.lower() if research_depth else "medium", "medium")
 
 
 def get_model_params(model_name, max_tokens_value=3000):
@@ -586,14 +622,21 @@ def get_stock_news_openai(ticker, curr_date):
         
         print(f"[SOCIAL] Using ticker format: {openai_ticker} (from input: {normalize_ticker_for_logs(ticker)})")
         
-        client = OpenAI(api_key=api_key)
+        # Use client with timeout for web search operations
+        client = get_openai_client_with_timeout(api_key)
         
         # Get the selected quick model from config
         config = get_config()
         model = config.get("quick_think_llm", "gpt-4o-mini")  # fallback to default
         
+        # Research depth controls prompt scope and search context
+        research_depth = config.get("research_depth", "Medium")
+        depth_key = research_depth.lower() if research_depth else "medium"
+        search_context = get_search_context_for_depth(research_depth)
+        
         from datetime import datetime, timedelta
-        start_date = (datetime.strptime(curr_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+        lookback_days = 3 if depth_key == "shallow" else 7 if depth_key == "medium" else 14
+        start_date = (datetime.strptime(curr_date, "%Y-%m-%d") - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
         # Get model-specific parameters
         model_params = get_model_params(model)
@@ -644,7 +687,7 @@ def get_stock_news_openai(ticker, curr_date):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "include": ["web_search_call.action.sources"]
                 }
@@ -653,8 +696,10 @@ def get_stock_news_openai(ticker, curr_date):
                 if "gpt-5.2-pro" in model:
                     api_params["store"] = True
                 else:
-                    api_params["reasoning"] = {"effort": "medium"}
-                    api_params["verbosity"] = "medium"
+                    effort_map = {"shallow": "low", "medium": "medium", "deep": "high"}
+                    verbosity_map = {"shallow": "low", "medium": "medium", "deep": "high"}
+                    api_params["reasoning"] = {"effort": effort_map.get(depth_key, "medium")}
+                    api_params["verbosity"] = verbosity_map.get(depth_key, "medium")
             elif is_gpt5:
                 # GPT-5 uses "developer" role - optimized for speed
                 api_params = {
@@ -718,7 +763,7 @@ def get_stock_news_openai(ticker, curr_date):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "store": True,
                     "include": ["web_search_call.action.sources"]
@@ -793,14 +838,21 @@ def get_global_news_openai(curr_date, ticker_context=None):
         return f"Error: OpenAI API key not found. Please set OPENAI_API_KEY environment variable."
     
     try:
-        client = OpenAI(api_key=api_key)
+        # Use client with timeout for web search operations
+        client = get_openai_client_with_timeout(api_key)
         
         # Get the selected quick model from config
         config = get_config()
         model = config.get("quick_think_llm", "gpt-4o-mini")  # fallback to default
         
+        # Research depth controls prompt scope and search context
+        research_depth = config.get("research_depth", "Medium")
+        depth_key = research_depth.lower() if research_depth else "medium"
+        search_context = get_search_context_for_depth(research_depth)
+        
         from datetime import datetime, timedelta
-        start_date = (datetime.strptime(curr_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+        lookback_days = 3 if depth_key == "shallow" else 7 if depth_key == "medium" else 14
+        start_date = (datetime.strptime(curr_date, "%Y-%m-%d") - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
         # Get model-specific parameters
         model_params = get_model_params(model)
@@ -819,24 +871,44 @@ def get_global_news_openai(curr_date, ticker_context=None):
         if is_gpt5 or is_gpt52 or is_gpt41:
             # Use responses.create() API with web search capabilities
             if is_crypto:
-                user_message = f"Search the web for current global news and developments from {start_date} to {curr_date} that would impact cryptocurrency markets and {ticker_context if ticker_context else 'crypto'} trading. Include:\n" + \
-                              f"1. Major cryptocurrency and blockchain regulatory developments\n" + \
-                              f"2. Central bank digital currency (CBDC) announcements and crypto policy updates\n" + \
-                              f"3. Institutional crypto adoption, ETF developments, and major investment flows\n" + \
-                              f"4. Major DeFi, smart contract, and blockchain protocol developments\n" + \
-                              f"5. Crypto exchange developments, security issues, and market infrastructure news\n" + \
-                              f"6. Macro events affecting crypto (Fed policy, inflation data, geopolitical developments)\n" + \
-                              f"7. Trading implications and crypto market sentiment\n" + \
-                              f"8. Summary table with key events and impact levels on crypto markets"
+                if depth_key == "shallow":
+                    user_message = (
+                        f"Search the web for key crypto market news from {start_date} to {curr_date} that could impact "
+                        f"{ticker_context if ticker_context else 'crypto'} trading. Focus on:\n"
+                        f"1. Major regulatory headlines\n"
+                        f"2. Major exchange or security events\n"
+                        f"3. Macro events affecting crypto sentiment\n"
+                        f"4. Summary table with key events and impact levels"
+                    )
+                else:
+                    user_message = f"Search the web for current global news and developments from {start_date} to {curr_date} that would impact cryptocurrency markets and {ticker_context if ticker_context else 'crypto'} trading. Include:\n" + \
+                                  f"1. Major cryptocurrency and blockchain regulatory developments\n" + \
+                                  f"2. Central bank digital currency (CBDC) announcements and crypto policy updates\n" + \
+                                  f"3. Institutional crypto adoption, ETF developments, and major investment flows\n" + \
+                                  f"4. Major DeFi, smart contract, and blockchain protocol developments\n" + \
+                                  f"5. Crypto exchange developments, security issues, and market infrastructure news\n" + \
+                                  f"6. Macro events affecting crypto (Fed policy, inflation data, geopolitical developments)\n" + \
+                                  f"7. Trading implications and crypto market sentiment\n" + \
+                                  f"8. Summary table with key events and impact levels on crypto markets"
             else:
-                user_message = f"Search the web for current global and macroeconomic news from {start_date} to {curr_date} that would be informative for trading {ticker_context if ticker_context else 'financial markets'}. Include:\n" + \
-                              f"1. Major economic events and announcements\n" + \
-                              f"2. Central bank policy updates\n" + \
-                              f"3. Geopolitical developments affecting markets\n" + \
-                              f"4. Economic data releases and their implications\n" + \
-                              f"5. Sector-specific developments relevant to {ticker_context if ticker_context else 'the market'}\n" + \
-                              f"6. Trading implications and market sentiment\n" + \
-                              f"7. Summary table with key events and impact levels"
+                if depth_key == "shallow":
+                    user_message = (
+                        f"Search the web for key global and macro news from {start_date} to {curr_date} that could impact "
+                        f"{ticker_context if ticker_context else 'financial markets'}. Focus on:\n"
+                        f"1. Major economic events and announcements\n"
+                        f"2. Central bank policy updates\n"
+                        f"3. Geopolitical developments affecting markets\n"
+                        f"4. Summary table with key events and impact levels"
+                    )
+                else:
+                    user_message = f"Search the web for current global and macroeconomic news from {start_date} to {curr_date} that would be informative for trading {ticker_context if ticker_context else 'financial markets'}. Include:\n" + \
+                                  f"1. Major economic events and announcements\n" + \
+                                  f"2. Central bank policy updates\n" + \
+                                  f"3. Geopolitical developments affecting markets\n" + \
+                                  f"4. Economic data releases and their implications\n" + \
+                                  f"5. Sector-specific developments relevant to {ticker_context if ticker_context else 'the market'}\n" + \
+                                  f"6. Trading implications and market sentiment\n" + \
+                                  f"7. Summary table with key events and impact levels"
             
             # Base parameters for responses.create()
             if is_gpt52:
@@ -867,7 +939,7 @@ def get_global_news_openai(curr_date, ticker_context=None):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "include": ["web_search_call.action.sources"]
                 }
@@ -876,8 +948,10 @@ def get_global_news_openai(curr_date, ticker_context=None):
                 if "gpt-5.2-pro" in model:
                     api_params["store"] = True
                 else:
-                    api_params["reasoning"] = {"effort": "medium"}
-                    api_params["verbosity"] = "medium"
+                    effort_map = {"shallow": "low", "medium": "medium", "deep": "high"}
+                    verbosity_map = {"shallow": "low", "medium": "medium", "deep": "high"}
+                    api_params["reasoning"] = {"effort": effort_map.get(depth_key, "medium")}
+                    api_params["verbosity"] = verbosity_map.get(depth_key, "medium")
             elif is_gpt5:
                 # GPT-5 uses "developer" role
                 api_params = {
@@ -907,11 +981,15 @@ def get_global_news_openai(curr_date, ticker_context=None):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "store": True,
                     "include": ["reasoning.encrypted_content", "web_search_call.action.sources"]
                 }
+                effort_map = {"shallow": "low", "medium": "medium", "deep": "high"}
+                verbosity_map = {"shallow": "low", "medium": "medium", "deep": "high"}
+                api_params["reasoning"]["effort"] = effort_map.get(depth_key, "medium")
+                api_params["text"]["verbosity"] = verbosity_map.get(depth_key, "medium")
             elif is_gpt41:
                 # GPT-4.1 uses "system" role  
                 api_params = {
@@ -941,7 +1019,7 @@ def get_global_news_openai(curr_date, ticker_context=None):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "store": True,
                     "include": ["web_search_call.action.sources"]
@@ -1005,11 +1083,15 @@ def get_fundamentals_openai(ticker, curr_date):
         return f"Error: OpenAI API key not found. Please set OPENAI_API_KEY environment variable."
     
     try:
-        client = OpenAI(api_key=api_key)
+        # Use client with timeout for web search operations
+        client = get_openai_client_with_timeout(api_key)
         
         # Get the selected quick model from config
         config = get_config()
         model = config.get("quick_think_llm", "gpt-4o-mini")  # fallback to default
+        
+        # Get search context size based on research depth
+        search_context = get_search_context_for_depth()
         
         from datetime import datetime, timedelta
         start_date = (datetime.strptime(curr_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -1067,7 +1149,7 @@ def get_fundamentals_openai(ticker, curr_date):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "include": ["web_search_call.action.sources"]
                 }
@@ -1107,7 +1189,7 @@ def get_fundamentals_openai(ticker, curr_date):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "store": True,
                     "include": ["reasoning.encrypted_content", "web_search_call.action.sources"]
@@ -1141,7 +1223,7 @@ def get_fundamentals_openai(ticker, curr_date):
                     "tools": [{
                         "type": "web_search",
                         "user_location": {"type": "approximate"},
-                        "search_context_size": "medium"
+                        "search_context_size": search_context
                     }],
                     "store": True,
                     "include": ["web_search_call.action.sources"]

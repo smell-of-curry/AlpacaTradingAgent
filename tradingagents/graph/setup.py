@@ -134,10 +134,33 @@ class GraphSetup:
                     
                     print(f"[PARALLEL] {analyst_type} analyst completed")
                     
-                    # Update UI status to completed
+                    # Determine report field name
+                    report_field = f"{analyst_type}_report"
+                    if analyst_type == "social":
+                        report_field = "sentiment_report"
+                    
+                    # Extract report content immediately
+                    report_content = None
+                    if final_state.get("messages"):
+                        last_msg = final_state["messages"][-1]
+                        if hasattr(last_msg, 'content') and last_msg.content:
+                            report_content = last_msg.content
+                    if not report_content and report_field in final_state:
+                        report_content = final_state.get(report_field)
+                    
+                    # Update UI state immediately (real-time update)
                     if ui_available:
                         analyst_name = f"{analyst_type.capitalize()} Analyst"
                         app_state.update_agent_status(analyst_name, "completed")
+                        
+                        # Store report in UI state immediately for real-time display
+                        if report_content:
+                            ticker = state.get("company_of_interest", "")
+                            if ticker:
+                                ui_state = app_state.get_state(ticker)
+                                if ui_state:
+                                    ui_state["current_reports"][report_field] = report_content
+                                    print(f"[PARALLEL] Real-time update: {analyst_type} report ({len(report_content)} chars) stored for {ticker}")
                     
                     return analyst_type, final_state
                     
@@ -187,26 +210,49 @@ class GraphSetup:
             
             # Collect all analyst reports
             for analyst_type, result_state in completed_results.items():
-                if result_state["messages"]:
-                    # Extract the analyst's report from their final message
+                # Determine the report field name
+                report_field = f"{analyst_type}_report"
+                if analyst_type == "social":
+                    report_field = "sentiment_report"
+                
+                # Try to extract content from the result state
+                content = None
+                
+                # First, try to get from messages
+                if result_state.get("messages"):
                     final_message = result_state["messages"][-1]
                     if hasattr(final_message, 'content') and final_message.content:
-                        # Store the report in the appropriate field
-                        report_field = f"{analyst_type}_report"
-                        if analyst_type == "social":
-                            report_field = "sentiment_report"
-                        
-                        # Add to state
-                        final_state[report_field] = final_message.content
-                        print(f"[PARALLEL] Stored {analyst_type} report")
-                        
-                        # Update report in UI state as well
-                        if ui_available:
-                            ticker = state.get("ticker", "")
-                            if ticker:
-                                ui_state = app_state.get_state(ticker)
-                                if ui_state:
-                                    ui_state["current_reports"][report_field] = final_message.content
+                        content = final_message.content
+                
+                # If no content from messages, check if the report field was set directly
+                if not content and report_field in result_state:
+                    content = result_state.get(report_field)
+                
+                # Store the content if we have any
+                if content:
+                    final_state[report_field] = content
+                    print(f"[PARALLEL] Stored {analyst_type} report ({len(content)} chars)")
+                    print(f"[PARALLEL]   Preview: {content[:150]}..." if len(content) > 150 else f"[PARALLEL]   Content: {content}")
+                    
+                    # Update report in UI state as well
+                    if ui_available:
+                        ticker = state.get("ticker", "")
+                        if ticker:
+                            ui_state = app_state.get_state(ticker)
+                            if ui_state:
+                                ui_state["current_reports"][report_field] = content
+                else:
+                    # Ensure the field exists even if empty
+                    if report_field not in final_state:
+                        final_state[report_field] = ""
+                    print(f"[PARALLEL] Warning: No content for {analyst_type} report")
+                    # Debug: show what we have in the result_state
+                    print(f"[PARALLEL]   result_state keys: {list(result_state.keys())}")
+                    if result_state.get("messages"):
+                        last_msg = result_state["messages"][-1]
+                        print(f"[PARALLEL]   Last message type: {type(last_msg).__name__}")
+                        if hasattr(last_msg, 'content'):
+                            print(f"[PARALLEL]   Last message content: {last_msg.content[:200] if last_msg.content else 'None'}...")
             
             print(f"[PARALLEL] Parallel analyst execution completed")
             return final_state

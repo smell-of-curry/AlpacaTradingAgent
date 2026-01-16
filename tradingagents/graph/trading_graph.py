@@ -17,6 +17,7 @@ from tradingagents.agents.utils.agent_states import (
     InvestDebateState,
     RiskDebateState,
 )
+from tradingagents.agents.utils.gpt5_llm import get_chat_model, is_gpt5_model, get_model_params_for_depth, describe_model_params
 from tradingagents.dataflows.interface import set_config
 from tradingagents.dataflows.config import get_api_key
 
@@ -58,36 +59,41 @@ class TradingAgentsGraph:
         # Get API key from environment variables or config
         api_key = get_api_key("openai_api_key", "OPENAI_API_KEY")
 
-        # Initialize LLMs with appropriate parameters based on model type
+        # Initialize LLMs with appropriate parameters based on model type and research depth
         deep_think_model = self.config["deep_think_llm"]
         quick_think_model = self.config["quick_think_llm"]
         
-        # Check if models don't support temperature parameter
-        deep_think_kwargs = {}
-        quick_think_kwargs = {}
+        # Get research depth from config (UI setting: "Shallow", "Medium", "Deep")
+        # This controls reasoning_effort, verbosity, and temperature based on model role
+        research_depth = self.config.get("research_depth", "Medium")
         
-        # Models that don't support temperature parameter
-        no_temp_models = ["o3", "o4-mini", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5.2", "gpt-5.2-pro"]
+        # Convert integer research_depth (from debate rounds) back to string if needed
+        if isinstance(research_depth, int):
+            depth_map = {1: "Shallow", 2: "Medium", 3: "Deep"}
+            research_depth = depth_map.get(research_depth, "Medium")
         
-        if not any(model_prefix in deep_think_model for model_prefix in no_temp_models):
-            deep_think_kwargs["temperature"] = 0.2
-            
-        if not any(model_prefix in quick_think_model for model_prefix in no_temp_models):
-            quick_think_kwargs["temperature"] = 0.2
+        # Get model parameters based on research depth and model role
+        # Quick thinker: prioritizes speed, lower reasoning effort
+        # Deep thinker: prioritizes quality, higher reasoning effort
+        quick_think_kwargs = get_model_params_for_depth(quick_think_model, research_depth, "quick")
+        deep_think_kwargs = get_model_params_for_depth(deep_think_model, research_depth, "deep")
         
-        # Note: GPT-5 specific parameters like effort, verbosity, format are not yet 
-        # supported by the current OpenAI Python client library. 
-        # These will be added when the client library is updated to support them.
+        # Log the configuration being used
+        quick_params_desc = describe_model_params(quick_think_model, research_depth, "quick")
+        deep_params_desc = describe_model_params(deep_think_model, research_depth, "deep")
+        print(f"[LLM CONFIG] Research Depth: {research_depth}")
+        print(f"[LLM CONFIG] Quick Thinker ({quick_think_model}): {quick_params_desc}")
+        print(f"[LLM CONFIG] Deep Thinker ({deep_think_model}): {deep_params_desc}")
         
-        self.deep_thinking_llm = ChatOpenAI(
-            model=deep_think_model, 
-            openai_api_key=api_key,
+        self.deep_thinking_llm = get_chat_model(
+            deep_think_model, 
+            api_key=api_key,
             **deep_think_kwargs
         )
         
-        self.quick_thinking_llm = ChatOpenAI(
-            model=quick_think_model, 
-            openai_api_key=api_key,
+        self.quick_thinking_llm = get_chat_model(
+            quick_think_model, 
+            api_key=api_key,
             **quick_think_kwargs
         )
         

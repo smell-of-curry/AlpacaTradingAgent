@@ -17,14 +17,18 @@ import time
 from functools import wraps
 
 
-def timing_wrapper(analyst_type, timeout_seconds=120):
+def timing_wrapper(analyst_type, timeout_seconds=120, uses_web_search=False):
     """
     Decorator to time function calls and track them for UI display with timeout protection
     
     Args:
         analyst_type: Type of analyst (MARKET, SOCIAL, etc.)
         timeout_seconds: Maximum execution time allowed (default 120s)
+        uses_web_search: If True, allows longer timeout for web search operations (adds 90s)
     """
+    # Web search tools need more time due to external API latency
+    if uses_web_search:
+        timeout_seconds = timeout_seconds + 180  # Give web search extra time (total 300s)
     
     def decorator(func):
         @wraps(func)
@@ -610,7 +614,7 @@ class Toolkit:
 
     @staticmethod
     @tool
-    @timing_wrapper("SOCIAL")
+    @timing_wrapper("SOCIAL", uses_web_search=True)
     def get_stock_news_openai(
         ticker: Annotated[str, "the company's ticker"],
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
@@ -630,7 +634,7 @@ class Toolkit:
 
     @staticmethod
     @tool
-    @timing_wrapper("NEWS")
+    @timing_wrapper("NEWS", uses_web_search=True)
     def get_global_news_openai(
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
         ticker_context: Annotated[str, "Ticker symbol for context-aware news (e.g., ETH/USD, AAPL)"] = None,
@@ -654,7 +658,7 @@ class Toolkit:
 
     @staticmethod
     @tool
-    @timing_wrapper("FUNDAMENTALS")
+    @timing_wrapper("FUNDAMENTALS", uses_web_search=True)
     def get_fundamentals_openai(
         ticker: Annotated[str, "the company's ticker"],
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
